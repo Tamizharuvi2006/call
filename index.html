@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1-1 Video Call Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 0;
+                height: 100vh;
+                width: 100vw;
+                position: fixed;
+                top: 0;
+                left: 0;
+                overflow: hidden;
+            }
+            
+            .call-container {
+                height: 100%;
+                position: relative;
+                touch-action: none;
+                cursor: move;
+                z-index: 20;
+            }
+            
+            #local-video-container {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                width: 100px;
+                height: 150px;
+                z-index: 30;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            }
+            
+            #remote-video-container {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                z-index: 10;
+            }
+            
+            .control-panel {
+                position: fixed;
+                bottom: 30px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 40;
+                display: flex;
+                gap: 20px;
+                background: rgba(0,0,0,0.5);
+                padding: 15px 25px;
+                border-radius: 30px;
+            }
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                border: none;
+                background: rgba(255,255,255,0.2);
+                color: white;
+                font-size: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .sidebar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                background: #1a1a1a;
+                transform: translateY(100%);
+                transition: transform 0.3s;
+                z-index: 30;
+                border-radius: 20px 20px 0 0;
+                padding: 20px;
+            }
+            
+            .sidebar.show {
+                transform: translateY(0);
+            }
+        }
+        
+        .upload-section {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .upload-btn {
+            background: linear-gradient(90deg, #00c6ff, #0072ff);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            transition: opacity 0.3s;
+            width: 100%;
+        }
+
+        .upload-btn:hover {
+            opacity: 0.9;
+        }
+
+        .video-link-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .video-link-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            background: #222;
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        .submit-btn {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+            width: 100%;
+        }
+
+        .submit-btn:hover {
+            background: #27ae60;
+        }
+
+        .video-details {
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .video-details.show {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .video-details p {
+            margin: 5px 0;
+            color: #ddd;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">VideoConnect</div>
+        <div class="user-info">User: John Doe</div>
+    </header>
+    
+    <!-- Add sidebar before main container -->
+    <div class="sidebar">
+        <div class="video-selector">
+            <h2>Available Videos</h2>
+            <div class="video-list" id="video-list">
+                <!-- Video items will be loaded here -->
+            </div>
+            <div class="upload-section">
+                <label for="video-upload" class="upload-btn">Upload Video</label>
+                <input type="file" id="video-upload" accept="video/*" multiple style="display: none;">
+                <div class="video-link-section">
+                    <input type="text" id="video-link" placeholder="Enter video URL" class="video-link-input">
+                    <button class="submit-btn" id="submit-link">Submit</button>
+                </div>
+                <style>
+                    .video-list {
+                        margin-top: 20px;
+                        max-height: 400px;
+                        overflow-y: auto;
+                        padding: 10px;
+                    }
+                    .video-item {
+                        background: #222;
+                        border: 1px solid #333;
+                        border-radius: 8px;
+                        padding: 15px;
+                        margin-bottom: 10px;
+                        color: #ddd;
+                    }
+                    .upload-message {
+                        text-align: center;
+                        color: #666;
+                        font-style: italic;
+                    }
+                </style>
+            </div>
+            <div id="uploaded-videos" class="video-list">
+                <p class="upload-message">Upload up to 10 videos before starting the call</p>
+            </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="status-indicator">
+            <span>Status:</span>
+            <span id="connection-status">Disconnected</span>
+        </div>
+        
+        <div class="call-container">
+            <div class="video-container" id="local-video-container">
+                <div class="no-video">
+                    Your camera is disabled
+                </div>
+                <video id="local-video" autoplay muted></video>
+                <div class="user-label">You</div>
+            </div>
+            
+            <div class="video-container" id="remote-video-container">
+                <div class="no-video">
+                    Waiting for connection...
+                </div>
+                <video id="remote-video"></video>
+                <div class="video-controls">
+                    <button id="rewind-btn">⏪</button>
+                    <button id="play-pause-btn">⏯️</button>
+                    <button id="fast-forward-btn">⏩</button>
+                    <div class="video-progress">
+                        <div class="progress-bar"></div>
+                    </div>
+                </div>
+                <div class="live-indicator">LIVE</div>
+                <div class="user-label">Remote User</div>
+            </div>
+        </div>
+        
+        <div class="control-panel">
+            <button class="control-btn" id="switch-camera">
+                🔄
+            </button>
+            <button class="control-btn" id="start-call">
+                Start Call
+            </button>
+            <button class="control-btn red" id="end-call" disabled>
+                End Call
+            </button>
+        </div>
+        
+        <div class="video-selector">
+            <h2>Select Video for Call</h2>
+            <div class="video-list" id="video-list">
+                <!-- Video items will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+<script src="script.js"></script>
+<script>
+    // Mobile-specific functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.querySelector('.sidebar');
+        const uploadBtn = document.createElement('button');
+        const callContainer = document.querySelector('.call-container');
+        const switchCameraBtn = document.getElementById('switch-camera');
+        let currentFacingMode = 'user';
+        let isDragging = false;
+        let currentX;
+        let currentY;
+        let initialX;
+        let initialY;
+        let xOffset = 0;
+        let yOffset = 0;
+
+        uploadBtn.className = 'control-btn';
+        uploadBtn.innerHTML = '📁';
+        uploadBtn.onclick = () => sidebar.classList.toggle('show');
+        
+        // Camera switching functionality
+        switchCameraBtn.addEventListener('click', async () => {
+            try {
+                currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+                const constraints = {
+                    video: { facingMode: currentFacingMode }
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                document.getElementById('local-video').srcObject = stream;
+            } catch (err) {
+                console.error('Error switching camera:', err);
+            }
+        });
+
+        // Add upload button to control panel in mobile view
+        if (window.innerWidth <= 768) {
+            document.querySelector('.control-panel').appendChild(uploadBtn);
+
+            // Touch events for dragging
+            callContainer.addEventListener('touchstart', dragStart, false);
+            callContainer.addEventListener('touchend', dragEnd, false);
+            callContainer.addEventListener('touchmove', drag, false);
+        }
+
+        function dragStart(e) {
+            initialX = e.touches[0].clientX - xOffset;
+            initialY = e.touches[0].clientY - yOffset;
+            if (e.target === callContainer) {
+                isDragging = true;
+            }
+        }
+
+        function dragEnd(e) {
+            initialX = currentX;
+            initialY = currentY;
+            isDragging = false;
+        }
+
+        function drag(e) {
+            if (isDragging) {
+                e.preventDefault();
+                currentX = e.touches[0].clientX - initialX;
+                currentY = e.touches[0].clientY - initialY;
+                xOffset = currentX;
+                yOffset = currentY;
+                setTranslate(currentX, currentY, callContainer);
+            }
+        }
+
+        function setTranslate(xPos, yPos, el) {
+            el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+        }
+
+        // Handle orientation change
+        window.addEventListener('orientationchange', () => {
+            if (window.innerWidth <= 768) {
+                document.querySelector('.control-panel').appendChild(uploadBtn);
+            }
+        });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!sidebar.contains(e.target) && !uploadBtn.contains(e.target)) {
+                sidebar.classList.remove('show');
+            }
+        });
+    });
+</script>
+</body>
+</html>
+<style>
+.video-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.video-progress {
+    flex-grow: 1;
+    height: 4px;
+    background: #444;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: #0072ff;
+    border-radius: 2px;
+    width: 0;
+}
+
+.video-controls button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 5px;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-controls button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+}
+@media (max-width: 768px) {
+    #video-upload {
+        display: block !important;
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        background: #222;
+        border: 1px solid #333;
+        border-radius: 4px;
+        color: white;
+    }
+    
+    .upload-btn {
+        display: block;
+        background: linear-gradient(90deg, #00c6ff, #0072ff);
+        color: white;
+        padding: 12px;
+        border-radius: 5px;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+}
+</style>
