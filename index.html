@@ -66,14 +66,33 @@ button {
   cursor: pointer;
 }
 button:hover { background: #0074c2; }
-.video-full, #localVideo.full {
+.video-full {
   position: absolute;
   top: 0; left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.video-pip, #localVideo.pip {
+.video-pip {
+  position: absolute;
+  bottom: 90px;
+  right: 20px;
+  width: 120px;
+  height: 160px;
+  object-fit: cover;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+#localVideo.full {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#localVideo.pip {
   position: absolute;
   bottom: 90px;
   right: 20px;
@@ -121,7 +140,7 @@ button:hover { background: #0074c2; }
 
 <div class="main">
   <!-- Upload Section -->
-  <div class="upload-section" id="uploadSection">
+  <div class="upload-section active" id="uploadSection">
     <h3>Upload up to 5 videos to start call</h3>
     <label for="videoUpload" class="upload-btn">Upload Videos 📹</label>
     <input type="file" id="videoUpload" accept="video/*" multiple hidden>
@@ -135,6 +154,7 @@ button:hover { background: #0074c2; }
     <div class="controls">
       <div id="callTimer">00:00</div>
       <button id="muteBtn">🎙️</button>
+      <button id="switchCamBtn">🔁</button>
       <button id="switchViewBtn">🔄</button>
       <button id="endCallBtn">❌</button>
     </div>
@@ -151,6 +171,7 @@ const startCallBtn = document.getElementById('startCall');
 const remoteVideo = document.getElementById('remoteVideo');
 const localVideo = document.getElementById('localVideo');
 const muteBtn = document.getElementById('muteBtn');
+const switchCamBtn = document.getElementById('switchCamBtn');
 const switchViewBtn = document.getElementById('switchViewBtn');
 const endCallBtn = document.getElementById('endCallBtn');
 const callTimer = document.getElementById('callTimer');
@@ -160,7 +181,6 @@ let currentVideoIndex = 0;
 let muted = false;
 let facingMode = "user";
 let localStream;
-let isVideoPrimary = true;
 let timerInterval;
 let seconds = 0;
 
@@ -183,7 +203,7 @@ videoUpload.addEventListener('change', (e) => {
 startCallBtn.addEventListener('click', () => {
   uploadSection.classList.remove('active');
   callSection.classList.add('active');
-  userList.style.display = "none"; // fully remove sidebar
+  userList.style.display = "none";
   playVideosLoop();
   startCamera();
   startTimer();
@@ -205,6 +225,9 @@ function playVideosLoop() {
 
 // Start camera
 function startCamera() {
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+  }
   navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: true })
     .then(stream => {
       localStream = stream;
@@ -212,6 +235,12 @@ function startCamera() {
     })
     .catch(err => alert("Camera/Mic Error: " + err));
 }
+
+// Switch camera
+switchCamBtn.addEventListener('click', () => {
+  facingMode = (facingMode === "user") ? "environment" : "user";
+  startCamera();
+});
 
 // Mute toggle
 muteBtn.addEventListener('click', () => {
@@ -222,29 +251,28 @@ muteBtn.addEventListener('click', () => {
   }
 });
 
-// Switch view
+// Switch view (SWAPS positions)
 function switchView() {
-  if (isVideoPrimary) {
-    remoteVideo.classList.replace('video-full', 'video-pip');
-    localVideo.classList.replace('pip', 'full');
+  if (remoteVideo.classList.contains('video-full')) {
+    remoteVideo.classList.remove('video-full');
+    remoteVideo.classList.add('video-pip');
+    localVideo.classList.remove('pip');
+    localVideo.classList.add('full');
   } else {
-    remoteVideo.classList.replace('video-pip', 'video-full');
-    localVideo.classList.replace('full', 'pip');
+    remoteVideo.classList.remove('video-pip');
+    remoteVideo.classList.add('video-full');
+    localVideo.classList.remove('full');
+    localVideo.classList.add('pip');
   }
-  isVideoPrimary = !isVideoPrimary;
 }
-
-// Button click to switch view
 switchViewBtn.addEventListener('click', switchView);
-
-// Clicking on videos also switches
-remoteVideo.addEventListener('click', () => { if (!isVideoPrimary) switchView(); });
-localVideo.addEventListener('click', () => { if (isVideoPrimary) switchView(); });
+remoteVideo.addEventListener('click', () => { if (!remoteVideo.classList.contains('video-full')) switchView(); });
+localVideo.addEventListener('click', () => { if (!localVideo.classList.contains('full')) switchView(); });
 
 // End call
 endCallBtn.addEventListener('click', () => {
   callSection.classList.remove('active');
-  userList.style.display = "block"; // show sidebar back
+  userList.style.display = "block";
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localVideo.srcObject = null;
@@ -258,10 +286,9 @@ endCallBtn.addEventListener('click', () => {
   stopTimer();
   callTimer.textContent = "00:00";
   seconds = 0;
-  if (!isVideoPrimary) switchView();
 });
 
-// Timer functions
+// Timer
 function startTimer() {
   timerInterval = setInterval(() => {
     seconds++;
@@ -270,11 +297,9 @@ function startTimer() {
     callTimer.textContent = `${mins}:${secs}`;
   }, 1000);
 }
-
 function stopTimer() {
   clearInterval(timerInterval);
 }
-
 </script>
 
 </body>
