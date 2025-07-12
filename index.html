@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Vidizzy Insta Call Clone with Mobile Scroll</title>
+<title>Vidizzy Insta Call Clone - Advanced</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
@@ -87,7 +87,7 @@ button:hover { background: #0074c2; }
   object-fit: cover;
   border: 2px solid #fff;
   border-radius: 12px;
-  cursor: pointer;
+  cursor: grab;
   transition: all 0.3s ease;
 }
 .controls {
@@ -101,15 +101,17 @@ button:hover { background: #0074c2; }
   border-radius: 40px;
   padding: 10px 15px;
   align-items: center;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
-
-/* Mobile Adjustments */
+.controls.hidden {
+  transform: translate(-50%, 100%);
+  opacity: 0;
+}
 @media (max-width: 768px) {
   .controls {
-    bottom: 60px; /* lifted for visibility */
+    bottom: 60px;
   }
 }
-
 .controls button {
   background: transparent;
   border: none;
@@ -146,7 +148,7 @@ button:hover { background: #0074c2; }
   <div class="call-section" id="callSection">
     <video id="remoteVideo" autoplay muted loop controls class="video-full"></video>
     <video id="localVideo" autoplay muted class="pip"></video>
-    <div class="controls">
+    <div class="controls" id="controls">
       <div id="callTimer">00:00</div>
       <button id="muteBtn">🎙️</button>
       <button id="switchCamBtn">🔁</button>
@@ -170,6 +172,7 @@ const switchCamBtn = document.getElementById('switchCamBtn');
 const switchViewBtn = document.getElementById('switchViewBtn');
 const endCallBtn = document.getElementById('endCallBtn');
 const callTimer = document.getElementById('callTimer');
+const controls = document.getElementById('controls');
 
 let uploadedVideos = [];
 let currentVideoIndex = 0;
@@ -178,10 +181,17 @@ let facingMode = "user";
 let localStream;
 let timerInterval;
 let seconds = 0;
+let isControlsVisible = true;
+
+// Vibrate utility
+function vibrate(ms=30) {
+  if (navigator.vibrate) navigator.vibrate(ms);
+}
 
 // User click
 users.forEach(user => {
   user.addEventListener('click', () => {
+    vibrate();
     uploadSection.classList.add('active');
     callSection.classList.remove('active');
   });
@@ -196,6 +206,7 @@ videoUpload.addEventListener('change', (e) => {
 
 // Start call
 startCallBtn.addEventListener('click', () => {
+  vibrate(50);
   uploadSection.classList.remove('active');
   callSection.classList.add('active');
   userList.style.display = "none";
@@ -233,12 +244,14 @@ function startCamera() {
 
 // Switch camera
 switchCamBtn.addEventListener('click', () => {
+  vibrate();
   facingMode = (facingMode === "user") ? "environment" : "user";
   startCamera();
 });
 
 // Mute toggle
 muteBtn.addEventListener('click', () => {
+  vibrate();
   if (localStream) {
     muted = !muted;
     localStream.getAudioTracks().forEach(track => track.enabled = !muted);
@@ -248,6 +261,7 @@ muteBtn.addEventListener('click', () => {
 
 // Switch view
 function switchView() {
+  vibrate();
   if (remoteVideo.classList.contains('video-full')) {
     remoteVideo.classList.remove('video-full');
     remoteVideo.classList.add('video-pip');
@@ -270,6 +284,7 @@ localVideo.addEventListener('click', () => { if (!localVideo.classList.contains(
 
 // End call
 endCallBtn.addEventListener('click', () => {
+  vibrate(50);
   callSection.classList.remove('active');
   userList.style.display = "block";
   if (localStream) {
@@ -299,8 +314,57 @@ function startTimer() {
 function stopTimer() {
   clearInterval(timerInterval);
 }
+
+// Swipe-to-dismiss controls
+let touchStartY = 0;
+controls.addEventListener('touchstart', e => {
+  touchStartY = e.touches[0].clientY;
+});
+controls.addEventListener('touchend', e => {
+  const touchEndY = e.changedTouches[0].clientY;
+  if (touchEndY - touchStartY > 50) {
+    // swipe down
+    controls.classList.add('hidden');
+    isControlsVisible = false;
+  } else if (touchStartY - touchEndY > 50) {
+    // swipe up
+    controls.classList.remove('hidden');
+    isControlsVisible = true;
+  }
+});
+
+// Draggable PiP
+let isDragging = false, offsetX, offsetY;
+localVideo.addEventListener('mousedown', startDrag);
+localVideo.addEventListener('touchstart', startDrag);
+
+function startDrag(e) {
+  e.preventDefault();
+  vibrate();
+  isDragging = true;
+  const rect = localVideo.getBoundingClientRect();
+  offsetX = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  offsetY = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('touchmove', drag);
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchend', endDrag);
+}
+function drag(e) {
+  if (!isDragging) return;
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - offsetX;
+  const y = (e.touches ? e.touches[0].clientY : e.clientY) - offsetY;
+  localVideo.style.left = x + 'px';
+  localVideo.style.top = y + 'px';
+}
+function endDrag() {
+  isDragging = false;
+  document.removeEventListener('mousemove', drag);
+  document.removeEventListener('touchmove', drag);
+  document.removeEventListener('mouseup', endDrag);
+  document.removeEventListener('touchend', endDrag);
+}
 </script>
 
 </body>
 </html>
-
